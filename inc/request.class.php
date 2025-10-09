@@ -424,14 +424,36 @@ class PluginConsumablesRequest extends CommonDBTM {
       echo "</td>";
       echo "</tr>";
 
-      echo "<tr>";
-      echo "<td>" . _n('Consumable type', 'Consumable types', 1) . " <span style='color:red;'>*</span></td>";
-      echo "<td>";
-      Dropdown::show("ConsumableItemType", ['entity' => $_SESSION['glpiactive_entity'], 'on_change' => 'loadAvailableConsumables(this);']);
-      $script = "function loadAvailableConsumables(object){this.consumableTypeID = object.value; consumables_reloadAvailableConsumables();}";
-      echo Html::scriptBlock($script);
-      echo "</td>";
-      echo "</tr>";
+   echo "<tr>";
+   echo "<td>" . _n('Consumable type', 'Consumable types', 1) . " <span style='color:red;'>*</span></td>";
+   echo "<td>";
+   
+   global $DB;
+   $query = "SELECT id, name FROM glpi_consumableitemtypes ORDER BY name";
+   $result = $DB->query($query);
+
+   $rand = mt_rand();
+
+   //Create dropdown manually : TODO: use ajax to generate dropdown
+   echo "<select name='consumableitemtypes_id' id='dropdown_consumableitemtypes_id{$rand}' 
+         class='form-select' onchange='loadAvailableConsumables(this);'>";
+   echo "<option value='0'>-----</option>";
+
+   while ($row = $DB->fetchAssoc($result)) {
+      echo "<option value='{$row['id']}'>" . htmlspecialchars($row['name']) . "</option>";
+   }
+
+   echo "</select>";
+
+   $script = "
+   function loadAvailableConsumables(object){
+      this.consumableTypeID = object.value;
+      consumables_reloadAvailableConsumables();
+   }";
+   echo Html::scriptBlock($script);
+
+   echo "</td>";
+   echo "</tr>";
 
       echo "<tr>";
       echo "<td>" . _n('Consumable', 'Consumables', 1) . " <span style='color:red;'>*</span></td>";
@@ -510,9 +532,14 @@ class PluginConsumablesRequest extends CommonDBTM {
 
       Html::requireJs('consumables');
 
-      // Init consumable cart javascript
-      echo Html::scriptBlock('$(document).ready(function() {consumables_initJs("' . $CFG_GLPI['root_doc'] . '", 
-                                                            "dropdown_consumable_itemtypes_id$rand");});');
+   // Initialisation JavaScript
+   $dropdownId = "dropdown_consumableitemtypes_id{$rand}";
+   
+   echo Html::scriptBlock("
+      \$(document).ready(function() {
+         consumables_initJs('{$CFG_GLPI['root_doc']}', '{$dropdownId}');
+      });
+   ");
 
       Html::closeForm();
    }
@@ -610,11 +637,11 @@ class PluginConsumablesRequest extends CommonDBTM {
     * @return array
     */
    function loadAvailableConsumables($type = 0) {
+      global $DB; 
 
       $dbu             = new DbUtils();
       $restrict        = ["consumableitemtypes_id" => $type];
       $consumableitems = $dbu->getAllDataFromTable("glpi_consumableitems", $restrict);
-      $crit            = "";
       $crit_ids        = [];
 
       if (!empty($consumableitems)) {
@@ -640,21 +667,42 @@ class PluginConsumablesRequest extends CommonDBTM {
             }
          }
       }
-      $criteria = $restrict;
+   
+      $query = "SELECT ci.id, ci.name 
+                FROM glpi_consumableitems ci
+                WHERE ci.consumableitemtypes_id = " . intval($type);
+   
       if (count($crit_ids) > 0) {
-         $criteria += ['NOT' => ['id' => $crit_ids]];
+         $query .= " AND ci.id NOT IN (" . implode(',', array_map('intval', $crit_ids)) . ")";
       }
-      Dropdown::show("ConsumableItem", ['name'      => 'consumables_id',
-                                        'condition' => $criteria,
-                                        'entity'    => $_SESSION['glpiactive_entity'],
-                                        'on_change' => 'loadAvailableConsumablesNumber(this);'
-      ]);
-
-      $script = "function loadAvailableConsumablesNumber(object){
+   
+      $query .= " ORDER BY ci.name";
+      
+      $result = $DB->query($query);
+      $items = [];
+   
+      while ($row = $DB->fetchAssoc($result)) {
+         $items[$row['id']] = $row['name'];
+      }
+   
+      $rand = mt_rand();
+   
+      echo "<select name='consumables_id' id='dropdown_consumables_id{$rand}' 
+            class='form-select' onchange='loadAvailableConsumablesNumber(this);'>";
+      echo "<option value='0'>-----</option>";
+   
+      foreach ($items as $id => $name) {
+         echo "<option value='{$id}'>" . htmlspecialchars($name) . "</option>";
+      }
+   
+      echo "</select>";
+   
+      echo "<script type='text/javascript'>
+      function loadAvailableConsumablesNumber(object){
       this.consumableID = object.value; 
       consumables_reloadAvailableConsumablesNumber();
-      }";
-      echo Html::scriptBlock($script);
+      }
+      </script>";
    }
 
    /**
@@ -679,15 +727,18 @@ class PluginConsumablesRequest extends CommonDBTM {
          $number = $maxcart;
       }
 
-      if (isset($used->$consumables_id)) {
+      if (is_object($used) && isset($used->$consumables_id)) {
          $number = $number - ($used->$consumables_id);
       }
 
       if ($number > 0) {
-         Dropdown::showNumber('number', ['value' => 0,
-                                         'max'   => $number]);
+         // generate input number HTML instead of dropdown
+         echo "<input type='number' name='number' id='input_number' class='form-control' 
+               min='1' max='{$number}' value='1' style='width: 150px;' required>";
+         echo "<small class='text-muted'>" . sprintf(__('Available: %d', 'consumables'), $number) . "</small>";
       } else {
-         echo __('No consumable') . "<input type='hidden' name='number' value='0'>";
+         echo "<span class='text-danger'>" . __('No consumable') . "</span>";
+         echo "<input type='hidden' name='number' value='0'>";
       }
    }
 
