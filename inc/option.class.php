@@ -28,407 +28,526 @@
  */
 
 if (!defined('GLPI_ROOT')) {
-   die("Sorry. You can't access directly to this file");
+    die("Sorry. You can't access directly to this file");
 }
 
 /**
  * Class PluginConsumablesOption
  */
-class PluginConsumablesOption extends CommonDBTM {
+class PluginConsumablesOption extends CommonDBTM
+{
 
-   static $rightname = "plugin_consumables";
+    static $rightname = "plugin_consumables";
 
-   /**
-    * Return the localized name of the current Type
-    * Should be overloaded in each new class
-    *
-    * @param integer $nb Number of items
-    *
-    * @return string
-    **/
-   public static function getTypeName($nb = 0) {
+    /**
+     * Return the localized name of the current Type
+     * Should be overloaded in each new class
+     *
+     * @param integer $nb Number of items
+     *
+     * @return string
+     **/
+    public static function getTypeName($nb = 0)
+    {
 
-      return __('Consumable request options', 'consumables');
-   }
+        return __('Consumable request options', 'consumables');
+    }
 
-   /**
-    * Show
-    *
-    * @param type $item
-    *
-    * @return bool
-    */
-   function showForConsumable($item) {
+    /**
+     * Show
+     *
+     * @param type $item
+     *
+     * @return bool
+     */
+    function showForConsumable($item)
+    {
 
-      if (!$this->canView()) {
-         return false;
-      }
-      $data = [];
-      if ($this->getFromDBByCrit(["consumables_id" => $item->fields['id']])) {
-         $data = $this->fields;
-      }
-      if (count($data) < 1) {
-         $data = $this->initConfig($item->fields['id']);
-      }
-      $this->listOptionsForConsumable($data, $item);
-   }
+        if (!$this->canView()) {
+            return false;
+        }
+        $data = [];
+        if ($this->getFromDBByCrit(["consumables_id" => $item->fields['id']])) {
+            $data = $this->fields;
+        }
+        if (count($data) < 1) {
+            $data = $this->initConfig($item->fields['id']);
+        }
+        $this->listOptionsForConsumable($data, $item);
+    }
 
-   /**
-    * Initialize the original configuration
-    *
-    * @param $ID
-    *
-    * @return array
-    */
-   function initConfig($ID) {
-      $input['consumables_id'] = $ID;
-      $input['groups']         = "";
-      $input['max_cart']       = "0";
-      $this->add($input);
-      return $this->fields;
-   }
+    /**
+     * Initialize the original configuration
+     *
+     * @param $ID
+     *
+     * @return array
+     */
+    function initConfig($ID)
+    {
+        $input['consumables_id'] = $ID;
+        $input['groups'] = "";
+        $input['max_cart'] = "0";
+        $this->add($input);
+        return $this->fields;
+    }
 
-   /**
-    * Show list of items
-    *
-    * @param $data
-    * @param $item
-    *
-    * @internal param \type $fields
-    */
-   function listOptionsForConsumable($data, $item) {
-      global $CFG_GLPI;
+    /**
+     * Show list of items using ITSM-ng v2 Twig form rendering
+     *
+     * @param $data
+     * @param $item
+     *
+     * @internal param \type $fields
+     */
+    function listOptionsForConsumable($data, $item)
+    {
+        global $CFG_GLPI;
 
-      $ID = $data['id'];
+        $ID = $data['id'];
 
-      echo "<div class='center'>";
-      echo "<form action='" . Toolbox::getItemTypeFormURL('PluginConsumablesOption') . "' method='post'>";
-      echo "<table class='tab_cadre_fixe'>";
-      echo "<tr>";
-      echo "<th colspan='3'>" . self::getTypeName(1) . "</th>";
-      echo "<tr class='tab_bg_1'>";
-      echo "<td>";
-      echo __('Maximum number allowed for request', 'consumables');
-      echo " </td>";
-      echo "<td>";
-      Dropdown::showNumber('max_cart', ['value' => $data['max_cart'],
-                                        'max'   => 100]);
-      echo " </td>";
-      if ($this->canCreate()) {
-         echo "<td class='center'>";
-         echo "<input type=\"submit\" name=\"update\" class=\"submit\"
-         value=\"" . _sx('button', 'Define', 'consumables') . "\" >";
-         echo "</td>";
-      }
-      echo "</tr>";
-      echo "<input type='hidden' name='consumables_id' value='" . $data['consumables_id'] . "'>";
-      echo "<input type='hidden' name='id' value='" . $ID . "'>";
-      echo "</table>";
-      Html::closeForm();
+        $groups = json_decode($data['groups'], true);
+        if (!is_array($groups)) {
+            $groups = [];
+        }
 
-      echo "<form action='" . Toolbox::getItemTypeFormURL('PluginConsumablesOption') . "' method='post'>";
-      echo "<table class='tab_cadre_fixe'>";
-      echo "<tr class='tab_bg_1'>";
-      echo "<th colspan='2'>";
-      echo __('Allowed groups for request', 'consumables');
-      echo " </th>";
-      echo "</tr>";
+        $form = [
+            'action' => Toolbox::getItemTypeFormURL('PluginConsumablesOption'),
+            'content' => [
+                __('Maximum number allowed for request', 'consumables') => [
+                    'visible' => true,
+                    'inputs' => [
+                        __('Maximum number allowed for request', 'consumables') => [
+                            'type' => 'number',
+                            'name' => 'max_cart',
+                            'value' => $data['max_cart'] ?? 0,
+                            'min' => 0,
+                            'max' => 100,
+                            'step' => 1,
+                        ],
+                    ],
+                ],
+            ],
+            'hidden' => [
+                'consumables_id' => $data['consumables_id'],
+                'id' => $ID,
+            ],
+        ];
 
-      $groups = json_decode($data['groups'], true);
-      if (!empty($groups)) {
-         foreach ($groups as $key => $val) {
+        if ($this->canCreate()) {
+            $form['buttons'] = [
+                [
+                    'class' => 'btn btn-secondary',
+                    'name' => 'update',
+                    'value' => _sx('button', 'Define', 'consumables'),
+                ],
+            ];
+        }
 
-            echo "<tr class='tab_bg_1 center'>";
-            echo "<td>";
-            echo Dropdown::getDropdownName("glpi_groups", $val);
+        renderTwigForm($form, '', $data);
+
+        self::showAddGroup($item, $data, $groups);
+    }
+
+    /**
+     * Show add group form using ITSM-ng v2 Twig rendering
+     *
+     * @param $item
+     * @param $data
+     * @param $groups array of existing groups
+     */
+    static function showAddGroup($item, $data, $groups = [])
+    {
+        global $CFG_GLPI;
+
+        $used = ($data["groups"] == '' ? [] : json_decode($data["groups"], true));
+        $rand = mt_rand();
+
+        $conditions = [
+            'is_assign' => 1,
+            'entities_id' => $item->fields['entities_id'],
+            'is_recursive' => $item->fields['is_recursive'],
+        ];
+
+        $select_input = [
+            'type' => 'select',
+            'name' => '_groups_id',
+            'id' => Html::cleanId("dropdown_groups_id{$rand}"),
+            'values' => getOptionForItems('Group', $conditions, true, false, $used),
+            'value' => '',
+        ];
+
+        echo "<form action='" . Toolbox::getItemTypeFormURL('PluginConsumablesOption') . "' method='post'>";
+        echo "<div class='form-section'>";
+        echo "<h2 class='form-section-header'>" . __('Add a group for request', 'consumables') . "</h2>";
+        echo "<div class='form-section-content'>";
+
+        echo "<div class='mb-3'>";
+        echo "<table id='GroupsTable_{$rand}' class='w-100 fs-6 table table-sm table-hover align-middle text-center'>";
+        echo "<tbody>";
+
+        if (!empty($groups)) {
+            foreach ($groups as $val) {
+                $group_name = Dropdown::getDropdownName("glpi_groups", $val);
+
+                echo "<tr data-id='{$val}'>";
+                echo "<td class='text-start'>";
+                echo "<i class='ti ti-users me-2'></i>";
+                echo $group_name;
+                echo "</td>";
+                echo "<td class='d-flex flex-row justify-content-end'>";
+
+                echo "<button type='button' class='btn btn-sm btn-outline-danger' ";
+                echo "aria-label='Remove group' ";
+                echo "onclick=\"removeGroup{$rand}('{$val}')\">";
+                echo "<i class='fas fa-times'></i>";
+                echo "</button>";
+
+                echo "</td>";
+                echo "</tr>";
+            }
+        } else {
+            echo "<tr>";
+            echo "<td colspan='2' class='text-center text-muted'>";
+            echo __('None');
             echo "</td>";
-            echo "<td>";
-            Html::showSimpleForm(Toolbox::getItemTypeFormURL('PluginConsumablesOption'),
-                                 'delete_groups',
-                                 _x('button', 'Delete permanently'),
-                                 ['delete_groups' => 'delete_groups',
-                                  'id'            => $ID,
-                                  '_groups_id'    => $val],
-                                 'fa-times-circle');
-            echo " </td>";
             echo "</tr>";
+        }
 
+        echo "</tbody>";
+        echo "</table>";
+        echo "</div>";
+
+        echo "<div class='row row-cols-'>";
+        echo "<div class='col-12 col-md-6 col-lg-4 text-start'>";
+        echo "<label for='" . $select_input['id'] . "' class='form-label w-100'>";
+        echo __('Group', 'consumables');
+        echo "<div class='d-flex flex-nowrap w-100 align-items-center input-group my-1'>";
+        renderTwigTemplate('macros/input.twig', $select_input);
+        echo "</div>";
+        echo "</label>";
+        echo "</div>";
+        echo "</div>";
+
+        echo "</div>";
+        echo "</div>";
+
+        echo Html::hidden('consumables_id', ['value' => $item->getID()]);
+        echo Html::hidden('id', ['value' => $data['id']]);
+        echo Html::hidden('_glpi_csrf_token', ['value' => $_SESSION['_glpi_csrf_token']]);
+
+        // Add submit button below the whole block
+        echo "<div class='d-flex justify-content-center mt-2'>";
+        echo Html::submit(_sx('button', 'Add'), ['class' => 'btn btn-secondary', 'name' => 'add_groups']);
+        echo "</div>";
+        echo "</form>";
+
+        // JavaScript for removing groups
+        echo Html::scriptBlock(<<<JAVASCRIPT
+function removeGroup{$rand}(groupId) {
+   if (confirm("Are you sure you want to remove this group?")) {
+      $.ajax({
+         url: "{$CFG_GLPI['root_doc']}/plugins/consumables/front/option.form.php",
+         type: "POST",
+         data: {
+            delete_groups: 'delete_groups',
+            id: {$data['id']},
+            _groups_id: groupId,
+            _glpi_csrf_token: '{$_SESSION['_glpi_csrf_token']}'
+         },
+         success: function(response) {
+            // Reload page to update dropdown options
+            window.location.reload();
+         },
+         error: function(xhr, status, error) {
+            alert('Error removing group: ' + error);
          }
-      } else {
-         echo "<tr class='tab_bg_1'>";
-         echo "<td colspan='2'>";
-         echo __('None');
-         echo "</td>";
-         echo "</tr>";
-      }
-
-      echo "<input type='hidden' name='consumables_id' value='" . $data['consumables_id'] . "'>";
-      echo "<input type='hidden' name='id' value='" . $ID . "'>";
-      echo "</table>";
-      Html::closeForm();
-      echo "</div>";
-
-      self::showAddGroup($item, $data);
+      });
    }
+}
+JAVASCRIPT
+         );
+    }
 
 
-   /**
-    * @param $item
-    * @param $data
-    */
-   static function showAddGroup($item, $data) {
-
-      echo "<form action='" . Toolbox::getItemTypeFormURL('PluginConsumablesOption') . "' method='post'>";
-      echo "<table class='tab_cadre_fixe' cellpadding='5'>";
-      echo "<tr class='tab_bg_1 center'>";
-      echo "<th>" . __('Add a group for request', 'consumables') . "</th>";
-      echo "<th>&nbsp;</th>";
-      echo "</tr>";
-      echo "<tr class='tab_bg_1 center'>";
-      echo "<td>";
-
-      $used = ($data["groups"] == '' ? [] : json_decode($data["groups"], true));
-
-      Group::dropdown(['name'        => '_groups_id',
-                       'used'        => $used,
-                       'entity'      => $item->fields['entities_id'],
-                       'entity_sons' => $item->fields["is_recursive"]]);
-
-      echo "</td>";
-      echo "<td><input type='hidden' name='consumables_id' value='" . $item->getID() . "'>";
-      echo "<input type='hidden' name='id' value='" . $data['id'] . "'>";
-      echo "<input type='submit' class='submit' name='add_groups' value='" . _sx('button', 'Add') . "'></td>";
-      echo "</tr>";
-      echo "</table>";
-      Html::closeForm();
-
-   }
-
-   /**
-    * @param array|\datas $params
-    *
-    * @return array|\datas
-    */
-   function prepareInputForUpdate($params) {
-      $dbu = new DbUtils();
-
-      if (isset($params["add_groups"])) {
-         $input = [];
-
-         $restrict = ["id" => $params['id']];
-         $configs  = $dbu->getAllDataFromTable("glpi_plugin_consumables_options", $restrict);
-
-         $groups = [];
-         if (!empty($configs)) {
-            foreach ($configs as $config) {
-               if (!empty($config["groups"])) {
-                  $groups = json_decode($config["groups"], true);
-                  if (count($groups) > 0) {
-                     if (!in_array($params["_groups_id"], $groups)) {
-                        array_push($groups, $params["_groups_id"]);
-                     }
-                  } else {
-                     $groups = [$params["_groups_id"]];
-                  }
-               } else {
-                  $groups = [$params["_groups_id"]];
-               }
-            }
-         }
-
-         $group = json_encode($groups);
-
-         $input['id']     = $params['id'];
-         $input['groups'] = $group;
-
-      } else if (isset($params["delete_groups"])) {
-
-         $restrict = ["id" => $params['id']];
-         $configs  = $dbu->getAllDataFromTable("glpi_plugin_consumables_options", $restrict);
-
-         $groups = [];
-         if (!empty($configs)) {
-            foreach ($configs as $config) {
-               if (!empty($config["groups"])) {
-                  $groups = json_decode($config["groups"], true);
-                  if (count($groups) > 0) {
-                     if (($key = array_search($params["_groups_id"], $groups)) !== false) {
-                        unset($groups[$key]);
-                     }
-                  }
-               }
-            }
-         }
-
-         if (count($groups) > 0) {
-            $group = json_encode($groups);
-         } else {
-            $group = "";
-         }
-
-         $input['id']     = $params['id'];
-         $input['groups'] = $group;
-
-      } else {
-         $input = $params;
-      }
-      return $input;
-   }
-
-   /**
-    * @return mixed
-    */
-   function getMaxCart() {
-      return $this->fields['max_cart'];
-   }
-
-   /**
-    * @return mixed
-    */
-   function getAllowedGroups() {
-      if(!empty($this->fields['groups'])) {
-         return json_decode($this->fields['groups'], true);
-      } else {
-         return [];
-      }
-   }
-
-   /**
-    * @since version 0.85
-    *
-    * @see CommonDBTM::showMassiveActionsSubForm()
-    **/
-   static function showMassiveActionsSubForm(MassiveAction $ma) {
-
-      switch ($ma->getAction()) {
-         case "add_number":
-            echo "</br>&nbsp;" . __('Maximum number allowed for request', 'consumables') . " : ";
-            Dropdown::showNumber('max_cart', ['value' => 0,
-                                              'min'   => 0,
-                                              'max'   => 100]);
-            echo "&nbsp;" .
-                 Html::submit(_x('button', 'Post'), ['name' => 'massiveaction']);
-            return true;
-            break;
-
-         case "add_groups":
-            echo "</br>&nbsp;" . __('Add a group for request', 'consumables') . " : ";
-            Group::dropdown(['name' => '_groups_id']);
-            echo "&nbsp;" .
-                 Html::submit(_x('button', 'Post'), ['name' => 'massiveaction']);
-            return true;
-            break;
-      }
-
-   }
 
 
-   /**
-    * @since version 0.85
-    *
-    * @see CommonDBTM::processMassiveActionsForOneItemtype()
-    **/
-   static function processMassiveActionsForOneItemtype(MassiveAction $ma, CommonDBTM $item,
-                                                       array $ids) {
+    /**
+     * @param array|\datas $params
+     *
+     * @return array|\datas
+     */
+    function prepareInputForUpdate($params)
+    {
+        $dbu = new DbUtils();
 
-      $option = new self();
+        if (isset($params["add_groups"])) {
+            $input = [];
 
-      switch ($ma->getAction()) {
-         case "add_number":
-            $input = $ma->getInput();
-            foreach ($ids as $id) {
+            $restrict = ["id" => $params['id']];
+            $configs = $dbu->getAllDataFromTable("glpi_plugin_consumables_options", $restrict);
 
-               $input = ['max_cart'       => $input['max_cart'],
-                         'consumables_id' => $id];
-
-               if ($item->getFromDB($id)) {
-                  if ($option->getFromDBByCrit(["consumables_id" => $id])) {
-
-                     $input['id'] = $option->getID();
-                     if ($option->can(-1, UPDATE, $input) && $option->update($input)) {
-                        $ma->itemDone($item->getType(), $id, MassiveAction::ACTION_OK);
-                     } else {
-                        $ma->itemDone($item->getType(), $id, MassiveAction::ACTION_KO);
-                     }
-
-                  } else {
-                     if ($option->can(-1, CREATE, $input) && $option->add($input)) {
-                        $ma->itemDone($item->getType(), $id, MassiveAction::ACTION_OK);
-
-                     } else {
-                        $ma->itemDone($item->getType(), $id, MassiveAction::ACTION_KO);
-                     }
-                  }
-               }
-
-            }
-            return;
-
-         case "add_groups":
-            $input = $ma->getInput();
-            foreach ($ids as $id) {
-
-               if ($item->getFromDB($id)) {
-                  if ($option->getFromDBByCrit(["consumables_id" => $id])) {
-                     $groups = json_decode($option->fields["groups"], true);
-
-                     if (count($groups) > 0) {
-                        if (!in_array($input["_groups_id"], $groups)) {
-                           array_push($groups, $input["_groups_id"]);
+            $groups = [];
+            if (!empty($configs)) {
+                foreach ($configs as $config) {
+                    if (!empty($config["groups"])) {
+                        $groups = json_decode($config["groups"], true);
+                        if (count($groups) > 0) {
+                            if (!in_array($params["_groups_id"], $groups)) {
+                                array_push($groups, $params["_groups_id"]);
+                            }
+                        } else {
+                            $groups = [$params["_groups_id"]];
                         }
-                     } else {
-                        $groups = [$input["_groups_id"]];
-                     }
-
-                     $params = ['id'     => $option->getID(),
-                                'groups' => json_encode($groups)];
-
-                     $params['id'] = $option->getID();
-                     if ($option->can(-1, UPDATE, $params) && $option->update($params)) {
-                        $ma->itemDone($item->getType(), $id, MassiveAction::ACTION_OK);
-                     } else {
-                        $ma->itemDone($item->getType(), $id, MassiveAction::ACTION_KO);
-                     }
-
-                  } else {
-                     $params = ['consumables_id' => $id,
-                                'groups'         => json_encode([$input['_groups_id']])];
-
-                     if ($option->can(-1, CREATE, $params) && $option->add($params)) {
-                        $ma->itemDone($item->getType(), $id, MassiveAction::ACTION_OK);
-
-                     } else {
-                        $ma->itemDone($item->getType(), $id, MassiveAction::ACTION_KO);
-                     }
-                  }
-               }
-
+                    } else {
+                        $groups = [$params["_groups_id"]];
+                    }
+                }
             }
-            return;
-      }
-      parent::processMassiveActionsForOneItemtype($ma, $item, $ids);
-   }
 
-   /**
-    * @param $field
-    * @param $values
-    * @param $options   array
-    **/
-   static function getSpecificValueToDisplay($field, $values, array $options = []) {
-      if (!is_array($values)) {
-         $values = [$field => $values];
-      }
-      switch ($field) {
-         case 'groups':
-            $list_groups = '';
-            $groups      = json_decode($values['groups'], true);
-            if (!empty($groups)) {
-               foreach ($groups as $key => $val) {
-                  $list_groups .= Dropdown::getDropdownName("glpi_groups", $val) . "<br>";
-               }
+            $group = json_encode($groups);
+
+            $input['id'] = $params['id'];
+            $input['groups'] = $group;
+
+        } else if (isset($params["delete_groups"])) {
+
+            $restrict = ["id" => $params['id']];
+            $configs = $dbu->getAllDataFromTable("glpi_plugin_consumables_options", $restrict);
+
+            $groups = [];
+            if (!empty($configs)) {
+                foreach ($configs as $config) {
+                    if (!empty($config["groups"])) {
+                        $groups = json_decode($config["groups"], true);
+                        if (count($groups) > 0) {
+                            if (($key = array_search($params["_groups_id"], $groups)) !== false) {
+                                unset($groups[$key]);
+                            }
+                        }
+                    }
+                }
             }
-            return $list_groups;
-      }
-      return parent::getSpecificValueToDisplay($field, $values, $options);
-   }
+
+            if (count($groups) > 0) {
+                $group = json_encode($groups);
+            } else {
+                $group = "";
+            }
+
+            $input['id'] = $params['id'];
+            $input['groups'] = $group;
+
+        } else {
+            $input = $params;
+        }
+        return $input;
+    }
+
+    /**
+     * @return mixed
+     */
+    function getMaxCart()
+    {
+        return $this->fields['max_cart'];
+    }
+
+    /**
+     * @return mixed
+     */
+    function getAllowedGroups()
+    {
+        if (!empty($this->fields['groups'])) {
+            return json_decode($this->fields['groups'], true);
+        } else {
+            return [];
+        }
+    }
+
+    /**
+     * @since version 0.85
+     *
+     * @see CommonDBTM::showMassiveActionsSubForm()
+     **/
+    static function showMassiveActionsSubForm(MassiveAction $ma)
+    {
+
+        switch ($ma->getAction()) {
+            case "add_number":
+                echo "<div class='mb-3'>";
+                echo "<label>" . __('Maximum number allowed for request', 'consumables') . "</label>";
+                $form = [
+                    'content' => [
+                        '' => [
+                            'visible' => true,
+                            'inputs' => [
+                                '' => [
+                                    'type' => 'number',
+                                    'name' => 'max_cart',
+                                    'value' => 0,
+                                    'min' => 0,
+                                    'max' => 100,
+                                    'step' => 1,
+                                ],
+                            ],
+                        ],
+                    ],
+                ];
+                renderTwigForm($form);
+                echo "</div>";
+                echo Html::submit(_x('button', 'Post'), ['name' => 'massiveaction']);
+                return true;
+                break;
+
+            case "add_groups":
+                echo "<div class='mb-3'>";
+                echo "<label>" . __('Add a group for request', 'consumables') . "</label>";
+                $form = [
+                    'content' => [
+                        '' => [
+                            'visible' => true,
+                            'inputs' => [
+                                '' => [
+                                    'type' => 'select',
+                                    'name' => '_groups_id',
+                                    'itemtype' => 'Group',
+                                    'condition' => [
+                                        'is_assign' => 1,
+                                    ],
+                                    'values' => getOptionForItems('Group', ['is_assign' => 1]),
+                                    'value' => '',
+                                    'actions' => getItemActionButtons(['info', 'add'], 'Group'),
+                                ],
+                            ],
+                        ],
+                    ],
+                ];
+                renderTwigForm($form);
+                echo "</div>";
+                echo Html::submit(_x('button', 'Post'), ['name' => 'massiveaction']);
+                return true;
+                break;
+        }
+
+    }
+
+
+    /**
+     * @since version 0.85
+     *
+     * @see CommonDBTM::processMassiveActionsForOneItemtype()
+     **/
+    static function processMassiveActionsForOneItemtype(
+        MassiveAction $ma,
+        CommonDBTM $item,
+        array $ids
+    ) {
+
+        $option = new self();
+
+        switch ($ma->getAction()) {
+            case "add_number":
+                $input = $ma->getInput();
+                foreach ($ids as $id) {
+
+                    $input = [
+                        'max_cart' => $input['max_cart'],
+                        'consumables_id' => $id
+                    ];
+
+                    if ($item->getFromDB($id)) {
+                        if ($option->getFromDBByCrit(["consumables_id" => $id])) {
+
+                            $input['id'] = $option->getID();
+                            if ($option->can(-1, UPDATE, $input) && $option->update($input)) {
+                                $ma->itemDone($item->getType(), $id, MassiveAction::ACTION_OK);
+                            } else {
+                                $ma->itemDone($item->getType(), $id, MassiveAction::ACTION_KO);
+                            }
+
+                        } else {
+                            if ($option->can(-1, CREATE, $input) && $option->add($input)) {
+                                $ma->itemDone($item->getType(), $id, MassiveAction::ACTION_OK);
+
+                            } else {
+                                $ma->itemDone($item->getType(), $id, MassiveAction::ACTION_KO);
+                            }
+                        }
+                    }
+
+                }
+                return;
+
+            case "add_groups":
+                $input = $ma->getInput();
+                foreach ($ids as $id) {
+
+                    if ($item->getFromDB($id)) {
+                        if ($option->getFromDBByCrit(["consumables_id" => $id])) {
+                            $groups = json_decode($option->fields["groups"], true);
+
+                            if (count($groups) > 0) {
+                                if (!in_array($input["_groups_id"], $groups)) {
+                                    array_push($groups, $input["_groups_id"]);
+                                }
+                            } else {
+                                $groups = [$input["_groups_id"]];
+                            }
+
+                            $params = [
+                                'id' => $option->getID(),
+                                'groups' => json_encode($groups)
+                            ];
+
+                            $params['id'] = $option->getID();
+                            if ($option->can(-1, UPDATE, $params) && $option->update($params)) {
+                                $ma->itemDone($item->getType(), $id, MassiveAction::ACTION_OK);
+                            } else {
+                                $ma->itemDone($item->getType(), $id, MassiveAction::ACTION_KO);
+                            }
+
+                        } else {
+                            $params = [
+                                'consumables_id' => $id,
+                                'groups' => json_encode([$input['_groups_id']])
+                            ];
+
+                            if ($option->can(-1, CREATE, $params) && $option->add($params)) {
+                                $ma->itemDone($item->getType(), $id, MassiveAction::ACTION_OK);
+
+                            } else {
+                                $ma->itemDone($item->getType(), $id, MassiveAction::ACTION_KO);
+                            }
+                        }
+                    }
+
+                }
+                return;
+        }
+        parent::processMassiveActionsForOneItemtype($ma, $item, $ids);
+    }
+
+    /**
+     * @param $field
+     * @param $values
+     * @param $options   array
+     **/
+    static function getSpecificValueToDisplay($field, $values, array $options = [])
+    {
+        if (!is_array($values)) {
+            $values = [$field => $values];
+        }
+        switch ($field) {
+            case 'groups':
+                $list_groups = '';
+                $groups = json_decode($values['groups'], true);
+                if (!empty($groups)) {
+                    foreach ($groups as $key => $val) {
+                        $list_groups .= Dropdown::getDropdownName("glpi_groups", $val) . "<br>";
+                    }
+                }
+                return $list_groups;
+        }
+        return parent::getSpecificValueToDisplay($field, $values, $options);
+    }
 }
