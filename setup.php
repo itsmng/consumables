@@ -84,7 +84,7 @@ function plugin_version_consumables() {
       'version'      => PLUGIN_CONSUMABLES_VERSION,
       'author'       => "<a href='http://blogglpi.infotel.com'>Infotel</a>",
       'license'      => 'GPLv2+',
-      'homepage'     => 'https://github.com/InfotelGLPI/consumables',
+      'homepage'     => 'https://github.com/itsmng/consumables',
       'requirements' => [
          'glpi' => [
             'min' => '9.5',
